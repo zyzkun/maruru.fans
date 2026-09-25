@@ -1,10 +1,5 @@
-const biliApiUrl = () => {
-  const isLocalServer =
-    window.location.hostname === 'localhost' ||
-    window.location.hostname === '127.0.0.1';
-
-  return isLocalServer ? `/api/fans?ts=${Date.now()}` : `./fans.json?ts=${Date.now()}`;
-};
+const FANS_API_URL = 'https://maruru-fans.onrender.com/api/fans';
+const biliApiUrl = () => `${FANS_API_URL}?ts=${Date.now()}`;
 const UAPI_UID = '3461581784484215';
 const FETCH_TIMEOUT_MS = 6000;
 
