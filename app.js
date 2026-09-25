@@ -10,6 +10,8 @@ const FETCH_TIMEOUT_MS = 6000;
 const SNAPSHOT_KEY = 'bilibili_maluolulu_daily_snapshots_v1';
 const LAST_SNAPSHOT_DATE_KEY = 'bilibili_maluolulu_last_snapshot_date_v1';
 const LAST_KNOWN_FANS_KEY = 'bilibili_maluolulu_last_known_fans_v1';
+const HISTORY_CSV_URL = './近90天数据趋势.csv';
+let historicalTrend = [];
 
 async function fetchWithTimeout(url, ms = 10000) {
   const ctrl = new AbortController();
@@ -60,12 +62,38 @@ function setLastSnapshotDate(dateKey) {
 function getLastKnownFans() {
   try {
     const raw = localStorage.getItem(LAST_KNOWN_FANS_KEY);
-    const value = raw === null ? null : Number(raw);
+    if (raw === null) return null;
+
+    const value = Number(raw);
     return Number.isFinite(value) ? value : null;
   } catch (error) {
     console.error('读取缓存粉丝数失败:', error);
     return null;
   }
+}
+
+function getLatestSnapshotCount() {
+  try {
+    const snapshots = getSnapshots();
+    if (!snapshots.length) return null;
+
+    const latest = [...snapshots].sort((a, b) => a.date.localeCompare(b.date)).pop();
+    const value = Number(latest?.count);
+    return Number.isFinite(value) ? value : null;
+  } catch (error) {
+    console.error('读取最新快照失败:', error);
+    return null;
+  }
+}
+
+function getFallbackDisplayFans() {
+  const savedFans = getLastKnownFans();
+  const latestSnapshotCount = getLatestSnapshotCount();
+
+  if (savedFans === null) return null;
+  if (latestSnapshotCount === null) return savedFans;
+
+  return Math.max(savedFans, latestSnapshotCount);
 }
 
 function setLastKnownFans(value) {
@@ -91,17 +119,85 @@ function setSnapshots(list) {
   localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(list.slice(-30)));
 }
 
+function normalizeCsvDate(dateText) {
+  const trimmed = String(dateText || '').trim();
+  if (!trimmed) return null;
+
+  const match = trimmed.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+  if (!match) return null;
+
+  const [, year, month, day] = match;
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function parseHistoryCsv(csvText) {
+  if (!csvText) return [];
+
+  const rows = csvText
+    .split(/\r?\n/)
+    .map((row) => row.trim())
+    .filter(Boolean);
+
+  if (rows.length < 2) return [];
+
+  const parsed = [];
+
+  for (let i = 1; i < rows.length; i += 1) {
+    const cells = rows[i].split(',');
+    const [dateText, totalText, newText, cancelText] = cells.map((cell) => cell.trim());
+    const normalizedDate = normalizeCsvDate(dateText);
+    const total = Number(totalText);
+
+    if (!normalizedDate || !Number.isFinite(total)) continue;
+
+    parsed.push({
+      date: normalizedDate,
+      count: total,
+      newCount: Number(newText) || 0,
+      cancelCount: Number(cancelText) || 0,
+    });
+  }
+
+  return parsed
+    .filter((item) => item.date)
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+async function loadHistoryTrend() {
+  try {
+    const response = await fetch(HISTORY_CSV_URL, { cache: 'no-store' });
+    if (!response.ok) {
+      throw new Error(`CSV fetch failed: ${response.status}`);
+    }
+
+    const csvText = await response.text();
+    const parsed = parseHistoryCsv(csvText);
+    if (!parsed.length) {
+      return;
+    }
+
+    historicalTrend = parsed.slice(-30);
+    setSnapshots(parsed.slice(-30));
+    renderSnapshotChart();
+    console.log('Loaded recent 30-day history trend from CSV:', historicalTrend.length);
+  } catch (error) {
+    console.warn('Failed to load recent 30-day trend CSV:', error);
+  }
+}
+
 function setLoadingState() {
-  if (lastKnownFans !== null) {
-    const displayValue = `${lastKnownFans.toLocaleString()}~`;
+  const fallbackFans = getFallbackDisplayFans();
+
+  if (fallbackFans !== null) {
+    const displayValue = `${fallbackFans.toLocaleString()}~`;
     if (fansDisplay) fansDisplay.textContent = displayValue;
     if (introCurrentFans) introCurrentFans.textContent = displayValue;
     if (todayGain) {
-      const gain = getYesterdayComparisonValue(lastKnownFans);
+      const gain = getYesterdayComparisonValue(fallbackFans);
       const sign = gain >= 0 ? '+' : '';
       todayGain.textContent = `今日新增：${sign}${gain.toLocaleString()}`;
     }
-    if (progressFill) progressFill.style.width = `${Math.min(100, (lastKnownFans / TOTAL_GOAL) * 100).toFixed(2)}%`;
+    if (progressFill) progressFill.style.width = `${Math.min(100, (fallbackFans / TOTAL_GOAL) * 100).toFixed(2)}%`;
     return;
   }
 
@@ -147,6 +243,7 @@ function saveDailySnapshot(fans) {
 
   snapshots.sort((a, b) => a.date.localeCompare(b.date));
   setSnapshots(snapshots);
+  setLastKnownFans(fans);
   setLastSnapshotDate(dateKey);
   updateTodayGainText(fans);
   renderSnapshotChart();
@@ -165,10 +262,7 @@ function ensureDailySnapshot(fans) {
       existing.count = fans;
       snapshots.sort((a, b) => a.date.localeCompare(b.date));
       setSnapshots(snapshots);
-      updateTodayGainText(fans);
-      renderSnapshotChart();
-    }
-  }
+      setLastKnownFans(fans);
 }
 
 function renderSnapshotChart(isLoading = false) {
@@ -177,8 +271,8 @@ function renderSnapshotChart(isLoading = false) {
 
   if (!snapshotChart || !snapshotList) return;
 
-  const snapshots = getSnapshots()
-    .slice()
+  const snapshots = (historicalTrend.length ? historicalTrend : getSnapshots())
+    .slice(-30)
     .sort((a, b) => a.date.localeCompare(b.date));
 
   if (isLoading) {
@@ -219,7 +313,10 @@ function renderSnapshotChart(isLoading = false) {
   const areaPath = `${linePath} L ${points[points.length - 1].x} ${height - bottom} L ${points[0].x} ${height - bottom} Z`;
 
   const labels = points
-    .map((point) => {
+    .map((point, index) => {
+      const isFinalPoint = index === points.length - 1;
+      const shouldShow = index === 0 || (index % 7 === 0 && !isFinalPoint && index < points.length - 1);
+      if (!shouldShow) return '';
       const labelText = point.date.slice(5);
       return `<text x="${point.x}" y="${height - 8}" text-anchor="middle">${labelText}</text>`;
     })
@@ -329,8 +426,8 @@ async function fetchFans() {
     }
   }
 
-  if (lastKnownFans !== null) {
-    const fallbackFans = lastKnownFans;
+  const fallbackFans = getFallbackDisplayFans();
+  if (fallbackFans !== null) {
     const fallbackText = `${fallbackFans.toLocaleString()}~`;
     fansDisplay.textContent = fallbackText;
     updateProgress(fallbackFans);
@@ -356,6 +453,7 @@ async function fetchFans() {
 lastKnownFans = getLastKnownFans();
 setLoadingState();
 renderSnapshotChart(true);
+loadHistoryTrend();
 
 setInterval(() => {
   if (currentFans > 0) {
