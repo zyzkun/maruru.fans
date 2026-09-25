@@ -1,7 +1,4 @@
-const biliApiUrl = () => {
-  if (window.location.port === '8000') return '/api/fans';
-  return 'http://localhost:8000/api/fans';
-};
+const biliApiUrl = () => `./fans.json?ts=${Date.now()}`;
 const UAPI_UID = '3461581784484215';
 const FETCH_TIMEOUT_MS = 6000;
 
