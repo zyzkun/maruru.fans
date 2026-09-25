@@ -1,0 +1,38 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "启动粉丝数网页服务",
+			"type": "shell",
+			"command": "python",
+			"args": [
+				"server.py"
+			],
+			"isBackground": true,
+			"problemMatcher": []
+		},
+		{
+			"label": "诊断粉丝数网页服务",
+			"type": "shell",
+			"command": "python",
+			"args": [
+				"-u",
+				"server.py"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "启动粉丝数服务端口8001",
+			"type": "shell",
+			"command": "py",
+			"args": [
+				"-3",
+				"-u",
+				"server.py"
+			],
+			"isBackground": true,
+			"problemMatcher": []
+		}
+	]
+}
