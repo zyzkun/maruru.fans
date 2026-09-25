@@ -5,6 +5,7 @@ const PROXY_LIST = [
   (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
   (u) => `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(u)}`,
 ];
+const FETCH_TIMEOUT_MS = 6000;
 
 const SNAPSHOT_KEY = 'bilibili_maluolulu_daily_snapshots_v1';
 const LAST_SNAPSHOT_DATE_KEY = 'bilibili_maluolulu_last_snapshot_date_v1';
@@ -250,12 +251,27 @@ function showChange(change) {
 }
 
 async function fetchFans() {
-  for (const buildUrl of PROXY_LIST) {
-    let ok = false;
+  const requests = [
+    () => fetchWithTimeout(biliApiUrl(), FETCH_TIMEOUT_MS),
+    ...PROXY_LIST.map((buildUrl) => () => fetchWithTimeout(buildUrl(biliApiUrl()), FETCH_TIMEOUT_MS)),
+  ];
+
+  let lastError = null;
+
+  for (const request of requests) {
     try {
-      const response = await fetchWithTimeout(buildUrl(biliApiUrl()));
-      const data = await response.json();
-      if (data.code === 0) {
+      const response = await request();
+      const text = await response.text();
+      let data = null;
+
+      try {
+        data = JSON.parse(text);
+      } catch (error) {
+        lastError = error;
+        continue;
+      }
+
+      if (data && data.code === 0 && data.data && Number.isFinite(Number(data.data.follower))) {
         const newFans = Number(data.data.follower);
         const change = currentFans === 0 ? 0 : newFans - currentFans;
 
@@ -270,21 +286,29 @@ async function fetchFans() {
           ensureDailySnapshot(newFans);
           showChange(change);
         }
-        ok = true;
-      } else {
-        console.error('API error:', data);
-        ok = true;
+        return;
+      }
+
+      if (data && data.message) {
+        console.error('API error:', data.message);
       }
     } catch (error) {
-      console.error('Proxy failed, try next:', buildUrl(biliApiUrl()), error);
+      lastError = error;
     }
+  }
 
-    if (ok) break;
+  if (currentFans === 0) {
+    setLoadingState();
+    renderSnapshotChart(true);
+  }
+
+  if (lastError) {
+    console.error('All Bilibili fetch attempts failed:', lastError);
   }
 
   setTimeout(() => {
     fetchFans();
-  }, 5000);
+  }, 8000);
 }
 
 setLoadingState();
