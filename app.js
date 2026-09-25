@@ -24,6 +24,7 @@ const progressFill = document.getElementById('progressFill');
 const changeToast = document.getElementById('changeToast');
 const introCurrentFans = document.getElementById('introCurrentFans');
 const todayGain = document.getElementById('todayGain');
+const LOADING_TEXT = '加载中...';
 let currentFans = 0;
 
 function getBjtDateKey(date = new Date()) {
@@ -66,6 +67,13 @@ function getSnapshots() {
 
 function setSnapshots(list) {
   localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(list.slice(-30)));
+}
+
+function setLoadingState() {
+  if (fansDisplay) fansDisplay.textContent = LOADING_TEXT;
+  if (introCurrentFans) introCurrentFans.textContent = LOADING_TEXT;
+  if (todayGain) todayGain.textContent = '今日新增：加载中...';
+  if (progressFill) progressFill.style.width = '0%';
 }
 
 function updateIntroText(fans) {
@@ -128,7 +136,7 @@ function ensureDailySnapshot(fans) {
   }
 }
 
-function renderSnapshotChart() {
+function renderSnapshotChart(isLoading = false) {
   const snapshotChart = document.getElementById('snapshotChart');
   const snapshotList = document.getElementById('snapshotList');
 
@@ -137,6 +145,12 @@ function renderSnapshotChart() {
   const snapshots = getSnapshots()
     .slice()
     .sort((a, b) => a.date.localeCompare(b.date));
+
+  if (isLoading) {
+    snapshotChart.innerHTML = '<div class="chart-empty">加载中...</div>';
+    snapshotList.innerHTML = '<li class="snapshot-empty">加载中...</li>';
+    return;
+  }
 
   if (!snapshots.length) {
     snapshotChart.innerHTML = '<div class="chart-empty">暂无历史快照</div>';
@@ -246,11 +260,16 @@ async function fetchFans() {
         const change = currentFans === 0 ? 0 : newFans - currentFans;
 
         currentFans = newFans;
-        fansDisplay.textContent = newFans.toLocaleString();
-        updateProgress(newFans);
-        updateIntroText(newFans);
-        ensureDailySnapshot(newFans);
-        showChange(change);
+        if (newFans === 0) {
+          setLoadingState();
+          renderSnapshotChart(true);
+        } else {
+          fansDisplay.textContent = newFans.toLocaleString();
+          updateProgress(newFans);
+          updateIntroText(newFans);
+          ensureDailySnapshot(newFans);
+          showChange(change);
+        }
         ok = true;
       } else {
         console.error('API error:', data);
@@ -268,11 +287,8 @@ async function fetchFans() {
   }, 5000);
 }
 
-fansDisplay.textContent = '0';
-updateProgress(0);
-updateIntroText(0);
-updateTodayGainText(0);
-renderSnapshotChart();
+setLoadingState();
+renderSnapshotChart(true);
 
 setInterval(() => {
   if (currentFans > 0) {
