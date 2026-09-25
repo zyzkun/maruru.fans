@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: maruru-fans-api
+    runtime: python
+    plan: free
+    buildCommand: ""
+    startCommand: python -u server.py
+    envVars:
+      - key: BILIBILI_UID
+        value: "3461581784484215"
