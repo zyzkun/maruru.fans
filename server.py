@@ -7,8 +7,7 @@ from urllib import parse, request
 ROOT = os.path.dirname(os.path.abspath(__file__))
 PORT = int(os.environ.get('PORT', '8000'))
 BILIBILI_UID = os.environ.get('BILIBILI_UID', '3461581784484215').strip()
-FANS_API_URL = os.environ.get('FANS_API_URL', '').strip()
-FANS_API_KEY = os.environ.get('FANS_API_KEY', '').strip()
+BILIBILI_CARD_API = 'https://api.bilibili.com/x/web-interface/card'
 
 
 def safe_int(value):
@@ -18,50 +17,17 @@ def safe_int(value):
         return None
 
 
-def extract_follower(payload):
-    if isinstance(payload, dict):
-        for key, value in payload.items():
-            lowered = str(key).lower()
-            if lowered in {'follower', 'fans', 'follow_count', 'fans_num'}:
-                parsed = safe_int(value)
-                if parsed is not None:
-                    return parsed
-        for value in payload.values():
-            found = extract_follower(value)
-            if found is not None:
-                return found
-    elif isinstance(payload, list):
-        for item in payload:
-            found = extract_follower(item)
-            if found is not None:
-                return found
-    return None
+def fetch_bilibili_card():
+    if not BILIBILI_UID.isdigit():
+        raise RuntimeError('BILIBILI_UID 必须是纯数字。')
 
-
-def build_remote_url():
-    if not FANS_API_URL:
-        raise RuntimeError('未配置 FANS_API_URL；请在环境变量里填写云 API 地址。')
-
-    url = FANS_API_URL.strip()
-    if '{uid}' in url:
-        url = url.replace('{uid}', BILIBILI_UID)
-    elif 'uid=' not in url:
-        separator = '&' if '?' in url else '?'
-        url = f'{url}{separator}uid={BILIBILI_UID}'
-
-    if FANS_API_KEY and 'api_key=' not in url.lower() and 'apikey=' not in url.lower():
-        separator = '&' if '?' in url else '?'
-        url = f'{url}{separator}api_key={parse.quote(FANS_API_KEY)}'
-
-    return url
-
-
-def fetch_remote_follower():
-    url = build_remote_url()
+    query = parse.urlencode({'mid': BILIBILI_UID, 'jsonp': 'jsonp'})
+    url = f'{BILIBILI_CARD_API}?{query}'
     req = request.Request(
         url,
         headers={
-            'User-Agent': 'Mozilla/5.0 (compatible; fan-site/1.0)',
+            'User-Agent': 'Mozilla/5.0',
+            'Referer': f'https://space.bilibili.com/{BILIBILI_UID}/',
             'Accept': 'application/json',
         },
     )
@@ -71,12 +37,23 @@ def fetch_remote_follower():
     try:
         payload = json.loads(text)
     except json.JSONDecodeError as exc:
-        raise RuntimeError(f'云 API 返回不是合法 JSON: {text[:200]}') from exc
+        raise RuntimeError(f'B 站接口返回不是合法 JSON: {text[:200]}') from exc
 
-    follower = extract_follower(payload)
+    if payload.get('code') != 0:
+        message = payload.get('message') or '没有找到这个 B 站用户'
+        raise RuntimeError(message)
+
+    data = payload.get('data') or {}
+    card = data.get('card') or {}
+    follower = safe_int(data.get('follower'))
     if follower is None:
-        raise RuntimeError(f'未能从云 API 返回中解析到 follower：{text[:200]}')
-    return follower
+        raise RuntimeError(f'未能从 B 站返回中解析到 follower：{text[:200]}')
+
+    return {
+        'uid': BILIBILI_UID,
+        'username': card.get('name'),
+        'follower': follower,
+    }
 
 
 class FanProxyHandler(SimpleHTTPRequestHandler):
@@ -93,8 +70,8 @@ class FanProxyHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path.startswith('/api/fans'):
             try:
-                follower = fetch_remote_follower()
-                payload = json.dumps({'follower': follower}).encode('utf-8')
+                result = fetch_bilibili_card()
+                payload = json.dumps(result, ensure_ascii=False).encode('utf-8')
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json; charset=utf-8')
                 self.send_header('Content-Length', str(len(payload)))
@@ -122,7 +99,7 @@ if __name__ == '__main__':
     os.chdir(ROOT)
     httpd = ThreadingHTTPServer(('0.0.0.0', PORT), FanProxyHandler)
     print(f'Fan backend running on http://localhost:{PORT}')
-    print('Set FANS_API_URL and optionally FANS_API_KEY before calling /api/fans')
+    print(f'Bilibili UID: {BILIBILI_UID}')
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
