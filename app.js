@@ -27,6 +27,7 @@ const introCurrentFans = document.getElementById('introCurrentFans');
 const todayGain = document.getElementById('todayGain');
 const LOADING_TEXT = '加载中...';
 let currentFans = 0;
+let lastKnownFans = null;
 
 function getBjtDateKey(date = new Date()) {
   const formatter = new Intl.DateTimeFormat('en-CA', {
@@ -71,6 +72,15 @@ function setSnapshots(list) {
 }
 
 function setLoadingState() {
+  if (lastKnownFans !== null) {
+    const displayValue = `${lastKnownFans.toLocaleString()}~`;
+    if (fansDisplay) fansDisplay.textContent = displayValue;
+    if (introCurrentFans) introCurrentFans.textContent = `${lastKnownFans.toLocaleString()} ~`;
+    if (todayGain) todayGain.textContent = `今日新增：${getYesterdayComparisonValue(lastKnownFans) >= 0 ? '+' : ''}${getYesterdayComparisonValue(lastKnownFans).toLocaleString()}`;
+    if (progressFill) progressFill.style.width = `${Math.min(100, (lastKnownFans / TOTAL_GOAL) * 100).toFixed(2)}%`;
+    return;
+  }
+
   if (fansDisplay) fansDisplay.textContent = LOADING_TEXT;
   if (introCurrentFans) introCurrentFans.textContent = LOADING_TEXT;
   if (todayGain) todayGain.textContent = '今日新增：加载中...';
@@ -276,16 +286,13 @@ async function fetchFans() {
         const change = currentFans === 0 ? 0 : newFans - currentFans;
 
         currentFans = newFans;
-        if (newFans === 0) {
-          setLoadingState();
-          renderSnapshotChart(true);
-        } else {
-          fansDisplay.textContent = newFans.toLocaleString();
-          updateProgress(newFans);
-          updateIntroText(newFans);
-          ensureDailySnapshot(newFans);
-          showChange(change);
-        }
+        lastKnownFans = newFans;
+
+        fansDisplay.textContent = newFans.toLocaleString();
+        updateProgress(newFans);
+        updateIntroText(newFans);
+        ensureDailySnapshot(newFans);
+        showChange(change);
         return;
       }
 
@@ -297,9 +304,18 @@ async function fetchFans() {
     }
   }
 
-  if (currentFans === 0) {
+  if (lastKnownFans !== null) {
+    const fallbackFans = lastKnownFans;
+    fansDisplay.textContent = `${fallbackFans.toLocaleString()}~`;
+    updateProgress(fallbackFans);
+    if (introCurrentFans) introCurrentFans.textContent = `${fallbackFans.toLocaleString()} ~`;
+    if (todayGain) {
+      const gain = getYesterdayComparisonValue(fallbackFans);
+      const sign = gain >= 0 ? '+' : '';
+      todayGain.textContent = `今日新增：${sign}${gain.toLocaleString()}`;
+    }
+  } else {
     setLoadingState();
-    renderSnapshotChart(true);
   }
 
   if (lastError) {
@@ -308,10 +324,12 @@ async function fetchFans() {
 
   setTimeout(() => {
     fetchFans();
-  }, 8000);
+  }, 5000);
 }
 
-setLoadingState();
+if (lastKnownFans === null) {
+  setLoadingState();
+}
 renderSnapshotChart(true);
 
 setInterval(() => {

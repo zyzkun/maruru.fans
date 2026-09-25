@@ -21,59 +21,60 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <header class="site-header" role="banner">
-      <h1>魔法少女马路路</h1>
-    </header>
-
-    <main role="main" class="cards-container">
-      <section class="card link-card">
-        <div class="link-card-actions">
-          <a href="https://space.bilibili.com/3461581784484215" target="_blank" class="follow-button">
-            立刻去B站关注魔法少女马路路 !
-          </a>
+    <div class="page-shell">
+      <header class="site-header glass" role="banner">
+        <div class="brand-wrap">
+          <span class="live-badge">LIVE</span>
+          <h1>魔法少女马路路</h1>
         </div>
-      </section>
 
-      <section class="card fans-card">
-        <div class="fans-section">
-          <div id="changeToast" class="change-toast"></div>
-          <div class="big-fans" id="fansDisplay">加载中...</div>
-          <div id="todayGain" class="today-gain">今日新增：加载中...</div>
-          <div class="progress-container">
-            <div class="progress-fill" id="progressFill" style="width: 0%;"></div>
+        <a href="https://space.bilibili.com/3461581784484215" target="_blank" class="follow-button">
+          去 B 站关注
+        </a>
+      </header>
 
+      <main role="main" class="dashboard">
+        <section class="glass fan-panel">
+          <div class="fans-section">
+            <div id="changeToast" class="change-toast"></div>
+            <p class="label">当前粉丝数</p>
+            <div class="big-fans" id="fansDisplay">加载中...</div>
+            <div id="todayGain" class="today-gain">今日新增：加载中...</div>
+
+            <div class="progress-container">
+              <div class="progress-fill" id="progressFill" style="width: 0%;"></div>
+            </div>
+
+            <div class="goal-text">
+              <span>0</span>
+              <span>20,000</span>
+            </div>
           </div>
-          <div class="goal-text">
-            <span>0</span>
-            <span>20000</span>
-          </div>
-        </div>
-      </section>
+        </section>
 
-      <section class="card article-card">
-        <article>
-          <h2>魔法少女马路路 Up介绍</h2>
-          <p class="page-description">魔法少女马路路 是一位 Bilibili UP 主，当前粉丝数 <span id="introCurrentFans">0</span>，实时粉丝数会自动更新。</p>
-          <p>这里展示当前粉丝数量、今日新增变化以及里程碑进度。页面会每 5 秒自动刷新一次最新粉丝数，并保留最近 30 天的每日快照。</p>
-          <ul>
-            <li>实时粉丝数：每 5 秒自动刷新一次</li>
-            <li>今日新增：按北京时间每天 0 点记录一次快照并计算增量</li>
-            <li>里程碑：显示到达目标的进度状态</li>
-          </ul>
-        </article>
-      </section>
+        <section class="glass intro-panel">
+          <article>
+            <div class="section-kicker">UP 主介绍</div>
+            <h2>魔法少女马路路</h2>
+            <p class="page-description">当前粉丝数 <span id="introCurrentFans">0</span>，
+              实时数据会自动刷新。</p>
+            <p>这里展示当前粉丝数量、今日新增变化和我的目标进度。
+              因为B站API反应很慢所以更新不是实时的，保留每日快照记录。</p>
 
-      <section class="card chart-card">
-        <h2>粉丝趋势与每日快照</h2>
-        <div class="chart-wrap" id="snapshotChart"></div>
-        <ul class="snapshot-list" id="snapshotList"></ul>
-      </section>
+          </article>
+        </section>
 
-    </main>
+        <section class="glass chart-panel">
+          <div class="section-kicker">粉丝趋势</div>
+          <div class="chart-wrap" id="snapshotChart"></div>
+          <ul class="snapshot-list" id="snapshotList"></ul>
+        </section>
+      </main>
 
-    <footer class="global-footer" role="contentinfo">
-      加油啊!一定要拿到奖牌!!!
-    </footer>
+      <footer class="global-footer" role="contentinfo">
+        加油啊！一定要拿到奖牌！！！
+      </footer>
+    </div>
 
     <script>
       const BILIBILI_UID = '3461581784484215';
