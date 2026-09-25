@@ -3,23 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>魔法少女马路路粉丝数_历史趋势 - Bilibili 实时大屏</title>
-    <meta name="description" content="魔法少女马路路粉丝实时大屏：查看实时粉丝数、历史趋势和里程碑进度。" />
-    <meta property="og:site_name" content="Bilibili 实时大屏" />
+    <title>魔法少女马路路实时粉丝数哦哦哦哦哦❤~</title>
+    <meta name="description" content="魔法少女马路路" />
+    <meta property="og:site_name" content="魔法少女马路路" />
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="魔法少女马路路粉丝数_历史趋势 - Bilibili 实时大屏" />
-    <meta property="og:description" content="魔法少女马路路粉丝实时大屏：查看实时粉丝数、历史趋势和里程碑进度。" />
+    <meta property="og:title" content="小马路的粉丝数" />
+    <meta property="og:description" content="魔法少女马路路" />
     <meta property="og:url" content="https://example.com/" />
     <meta name="twitter:card" content="summary" />
+    <link rel="icon" href="icon.png" type="image/png" />
     <style>
       :root {
         --marker_1_display: block;
         --marker_1_progress: 20000;
-        --marker_2_display: block;
-        --marker_2_progress: 50000;
-        --marker_3_display: block;
-        --marker_3_progress: 100000;
-        --total_progress: 20000;
       }
     </style>
     <link rel="stylesheet" href="styles.css" />
@@ -41,8 +37,8 @@
       <section class="card fans-card">
         <div class="fans-section">
           <div id="changeToast" class="change-toast"></div>
-          <div class="big-fans" id="fansDisplay">0</div>
-          <div id="todayGain" class="today-gain">今日新增：+0</div>
+          <div class="big-fans" id="fansDisplay">加载中...</div>
+          <div id="todayGain" class="today-gain">今日新增：加载中...</div>
           <div class="progress-container">
             <div class="progress-fill" id="progressFill" style="width: 0%;"></div>
 
@@ -67,6 +63,11 @@
         </article>
       </section>
 
+      <section class="card chart-card">
+        <h2>粉丝趋势与每日快照</h2>
+        <div class="chart-wrap" id="snapshotChart"></div>
+        <ul class="snapshot-list" id="snapshotList"></ul>
+      </section>
 
     </main>
 
