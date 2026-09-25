@@ -9,6 +9,7 @@ const FETCH_TIMEOUT_MS = 6000;
 
 const SNAPSHOT_KEY = 'bilibili_maluolulu_daily_snapshots_v1';
 const LAST_SNAPSHOT_DATE_KEY = 'bilibili_maluolulu_last_snapshot_date_v1';
+const LAST_KNOWN_FANS_KEY = 'bilibili_maluolulu_last_known_fans_v1';
 
 async function fetchWithTimeout(url, ms = 10000) {
   const ctrl = new AbortController();
@@ -56,6 +57,25 @@ function setLastSnapshotDate(dateKey) {
   }
 }
 
+function getLastKnownFans() {
+  try {
+    const raw = localStorage.getItem(LAST_KNOWN_FANS_KEY);
+    const value = raw === null ? null : Number(raw);
+    return Number.isFinite(value) ? value : null;
+  } catch (error) {
+    console.error('读取缓存粉丝数失败:', error);
+    return null;
+  }
+}
+
+function setLastKnownFans(value) {
+  try {
+    localStorage.setItem(LAST_KNOWN_FANS_KEY, String(value));
+  } catch (error) {
+    console.error('写入缓存粉丝数失败:', error);
+  }
+}
+
 function getSnapshots() {
   try {
     const raw = localStorage.getItem(SNAPSHOT_KEY);
@@ -75,8 +95,12 @@ function setLoadingState() {
   if (lastKnownFans !== null) {
     const displayValue = `${lastKnownFans.toLocaleString()}~`;
     if (fansDisplay) fansDisplay.textContent = displayValue;
-    if (introCurrentFans) introCurrentFans.textContent = `${lastKnownFans.toLocaleString()} ~`;
-    if (todayGain) todayGain.textContent = `今日新增：${getYesterdayComparisonValue(lastKnownFans) >= 0 ? '+' : ''}${getYesterdayComparisonValue(lastKnownFans).toLocaleString()}`;
+    if (introCurrentFans) introCurrentFans.textContent = displayValue;
+    if (todayGain) {
+      const gain = getYesterdayComparisonValue(lastKnownFans);
+      const sign = gain >= 0 ? '+' : '';
+      todayGain.textContent = `今日新增：${sign}${gain.toLocaleString()}`;
+    }
     if (progressFill) progressFill.style.width = `${Math.min(100, (lastKnownFans / TOTAL_GOAL) * 100).toFixed(2)}%`;
     return;
   }
@@ -287,6 +311,7 @@ async function fetchFans() {
 
         currentFans = newFans;
         lastKnownFans = newFans;
+        setLastKnownFans(newFans);
 
         fansDisplay.textContent = newFans.toLocaleString();
         updateProgress(newFans);
@@ -306,9 +331,10 @@ async function fetchFans() {
 
   if (lastKnownFans !== null) {
     const fallbackFans = lastKnownFans;
-    fansDisplay.textContent = `${fallbackFans.toLocaleString()}~`;
+    const fallbackText = `${fallbackFans.toLocaleString()}~`;
+    fansDisplay.textContent = fallbackText;
     updateProgress(fallbackFans);
-    if (introCurrentFans) introCurrentFans.textContent = `${fallbackFans.toLocaleString()} ~`;
+    if (introCurrentFans) introCurrentFans.textContent = fallbackText;
     if (todayGain) {
       const gain = getYesterdayComparisonValue(fallbackFans);
       const sign = gain >= 0 ? '+' : '';
@@ -327,9 +353,8 @@ async function fetchFans() {
   }, 5000);
 }
 
-if (lastKnownFans === null) {
-  setLoadingState();
-}
+lastKnownFans = getLastKnownFans();
+setLoadingState();
 renderSnapshotChart(true);
 
 setInterval(() => {
