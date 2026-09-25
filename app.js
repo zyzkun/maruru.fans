@@ -1,10 +1,5 @@
-const biliApiUrl = () =>
-  `https://api.bilibili.com/x/relation/stat?vmid=${BILIBILI_UID}&time=${Date.now()}`;
-
-const PROXY_LIST = [
-  (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-  (u) => `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(u)}`,
-];
+const biliApiUrl = () => '/api/fans';
+const UAPI_UID = '3461581784484215';
 const FETCH_TIMEOUT_MS = 6000;
 
 const SNAPSHOT_KEY = 'bilibili_maluolulu_daily_snapshots_v1';
@@ -255,14 +250,19 @@ function ensureDailySnapshot(fans) {
 
   if (lastSnapshotDate !== dateKey) {
     saveDailySnapshot(fans);
-  } else {
-    const snapshots = getSnapshots();
-    const existing = snapshots.find((item) => item.date === dateKey);
-    if (existing && Number(existing.count) !== Number(fans)) {
-      existing.count = fans;
-      snapshots.sort((a, b) => a.date.localeCompare(b.date));
-      setSnapshots(snapshots);
-      setLastKnownFans(fans);
+    return;
+  }
+
+  const snapshots = getSnapshots();
+  const existing = snapshots.find((item) => item.date === dateKey);
+  if (existing && Number(existing.count) !== Number(fans)) {
+    existing.count = fans;
+    snapshots.sort((a, b) => a.date.localeCompare(b.date));
+    setSnapshots(snapshots);
+    setLastKnownFans(fans);
+    updateTodayGainText(fans);
+    renderSnapshotChart();
+  }
 }
 
 function renderSnapshotChart(isLoading = false) {
@@ -382,48 +382,32 @@ function showChange(change) {
 }
 
 async function fetchFans() {
-  const requests = [
-    () => fetchWithTimeout(biliApiUrl(), FETCH_TIMEOUT_MS),
-    ...PROXY_LIST.map((buildUrl) => () => fetchWithTimeout(buildUrl(biliApiUrl()), FETCH_TIMEOUT_MS)),
-  ];
+  try {
+    const response = await fetchWithTimeout(biliApiUrl(), FETCH_TIMEOUT_MS);
+    const data = await response.json();
+    const followerValue = Number(data?.follower ?? data?.data?.follower ?? data?.fans ?? data?.data?.fans ?? 0);
 
-  let lastError = null;
+    if (response.ok && Number.isFinite(followerValue) && followerValue > 0) {
+      const newFans = followerValue;
+      const change = currentFans === 0 ? 0 : newFans - currentFans;
 
-  for (const request of requests) {
-    try {
-      const response = await request();
-      const text = await response.text();
-      let data = null;
+      currentFans = newFans;
+      lastKnownFans = newFans;
+      setLastKnownFans(newFans);
 
-      try {
-        data = JSON.parse(text);
-      } catch (error) {
-        lastError = error;
-        continue;
-      }
-
-      if (data && data.code === 0 && data.data && Number.isFinite(Number(data.data.follower))) {
-        const newFans = Number(data.data.follower);
-        const change = currentFans === 0 ? 0 : newFans - currentFans;
-
-        currentFans = newFans;
-        lastKnownFans = newFans;
-        setLastKnownFans(newFans);
-
-        fansDisplay.textContent = newFans.toLocaleString();
-        updateProgress(newFans);
-        updateIntroText(newFans);
-        ensureDailySnapshot(newFans);
-        showChange(change);
-        return;
-      }
-
-      if (data && data.message) {
-        console.error('API error:', data.message);
-      }
-    } catch (error) {
-      lastError = error;
+      fansDisplay.textContent = newFans.toLocaleString();
+      updateProgress(newFans);
+      updateIntroText(newFans);
+      ensureDailySnapshot(newFans);
+      showChange(change);
+      return;
     }
+
+    if (data && data.error) {
+      console.warn('Backend fan API error:', data.error);
+    }
+  } catch (error) {
+    console.warn('Backend fan API fetch failed:', error);
   }
 
   const fallbackFans = getFallbackDisplayFans();
@@ -439,10 +423,6 @@ async function fetchFans() {
     }
   } else {
     setLoadingState();
-  }
-
-  if (lastError) {
-    console.error('All Bilibili fetch attempts failed:', lastError);
   }
 
   setTimeout(() => {
