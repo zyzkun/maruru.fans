@@ -173,8 +173,8 @@ async function loadHistoryTrend() {
     }
 
     historicalTrend = parsed.slice(-30);
-    setSnapshots(parsed.slice(-30));
     renderSnapshotChart();
+    if (currentFans > 0) updateTodayGainText(currentFans);
     console.log('Loaded recent 30-day history trend from CSV:', historicalTrend.length);
   } catch (error) {
     console.warn('Failed to load recent 30-day trend CSV:', error);
@@ -209,9 +209,12 @@ function updateIntroText(fans) {
 }
 
 function getYesterdayComparisonValue(fans) {
-  const snapshots = getSnapshots();
+  const snapshotsByDate = new Map(
+    historicalTrend.map((item) => [item.date, item]),
+  );
+  getSnapshots().forEach((item) => snapshotsByDate.set(item.date, item));
   const todayKey = getBjtDateKey();
-  const previous = [...snapshots]
+  const previous = [...snapshotsByDate.values()]
     .filter((item) => item.date < todayKey)
     .sort((a, b) => a.date.localeCompare(b.date))
     .pop();
@@ -272,9 +275,13 @@ function renderSnapshotChart(isLoading = false) {
 
   if (!snapshotChart || !snapshotList) return;
 
-  const snapshots = (historicalTrend.length ? historicalTrend : getSnapshots())
-    .slice(-30)
+  const snapshotsByDate = new Map(
+    historicalTrend.map((item) => [item.date, item]),
+  );
+  getSnapshots().forEach((item) => snapshotsByDate.set(item.date, item));
+  const snapshots = [...snapshotsByDate.values()]
     .sort((a, b) => a.date.localeCompare(b.date));
+  const recentSnapshots = snapshots.slice(-30);
 
   if (isLoading) {
     snapshotChart.innerHTML = '<div class="chart-empty">加载中...</div>';
@@ -282,7 +289,7 @@ function renderSnapshotChart(isLoading = false) {
     return;
   }
 
-  if (!snapshots.length) {
+  if (!recentSnapshots.length) {
     snapshotChart.innerHTML = '<div class="chart-empty">暂无历史快照</div>';
     snapshotList.innerHTML = '<li class="snapshot-empty">暂无记录</li>';
     return;
@@ -294,12 +301,12 @@ function renderSnapshotChart(isLoading = false) {
   const right = 16;
   const top = 18;
   const bottom = 28;
-  const maxValue = Math.max(...snapshots.map((item) => Number(item.count)), 1);
-  const minValue = Math.min(...snapshots.map((item) => Number(item.count)), 0);
+  const maxValue = Math.max(...recentSnapshots.map((item) => Number(item.count)), 1);
+  const minValue = Math.min(...recentSnapshots.map((item) => Number(item.count)), 0);
   const valueRange = maxValue - minValue || 1;
 
-  const points = snapshots.map((item, index) => {
-    const x = left + (index * (width - left - right)) / Math.max(snapshots.length - 1, 1);
+  const points = recentSnapshots.map((item, index) => {
+    const x = left + (index * (width - left - right)) / Math.max(recentSnapshots.length - 1, 1);
     const y =
       height -
       bottom -
@@ -349,7 +356,7 @@ function renderSnapshotChart(isLoading = false) {
     </svg>
   `;
 
-  snapshotList.innerHTML = snapshots
+  snapshotList.innerHTML = recentSnapshots
     .slice()
     .reverse()
     .map((item, index, all) => {
